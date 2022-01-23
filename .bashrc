@@ -103,3 +103,4 @@ cd /home;
 # filebrowser -a 0.0.0.0 --noauth -r / >/dev/null 2>&1 & 
 # cd /home
 # fi
+exec zsh

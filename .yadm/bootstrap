@@ -1,28 +1,102 @@
 #!/bin/sh
+set -e
+
+# Default settings
+ZSH=${ZSH:-~/.oh-my-zsh}
+REPO=${REPO:-oh-my-zsh}
+REMOTE=${REMOTE:-https://gitee.com/mirrors/${REPO}.git}
+BRANCH=${BRANCH:-master}
+
+# Other options
+CHSH=${CHSH:-no}
+RUNZSH=${RUNZSH:-yes}
+KEEP_ZSHRC=${KEEP_ZSHRC:-no}
 
 echo "Updating the yadm repo origin URL"
 yadm remote set-url origin "git@github.com:easy-quest/aid-dotfiles.git"
+
+if command -v zsh >/dev/null 2>&1; then
+  echo "Bootstraping Zsh"
+else
+  apt install zsh -y
+  wget -O  https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+  chmod +x install.sh && ./install.sh && rm install.sh
+  apt-get install fonts-powerline
+  git clone --depth=1 https://gitee.com/romkatv/powerlevel10k.git ~/powerlevel10k
+  return
+fi
+
+
+## Because Git submodule commands cannot operate without a work tree, they must
+## be run from within $HOME (assuming this is the root of your dotfiles)
+#cd "$HOME"
+
+#echo "Init submodules"
+#yadm submodule update --recursive --init
 
 if command -v vim >/dev/null 2>&1; then
   echo "Bootstraping Vim"
   vim '+PlugUpdate' '+PlugClean!' '+PlugUpdate' '+qall'
 fi
 
+main() {
+  # Run as unattended if stdin is not a tty
+  if [ ! -t 0 ]; then
+    RUNZSH=no
+    CHSH=no
+  fi
 
-if command -v zsh >/dev/null 2>&1; then
-  echo "Bootstraping Zsh"
-else
-  apt install zsh
-  exec zsh
-  sh -c "$(curl -fsSL https://gitee.com/shmhlsy/oh-my-zsh-install.sh/raw/master/install.sh)" 
-  apt-get install fonts-powerline
-  git clone --depth=1 https://gitee.com/romkatv/powerlevel10k.git ~/powerlevel10k
-fi
+  # Parse arguments
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --unattended) RUNZSH=no; CHSH=no ;;
+      --skip-chsh) CHSH=no ;;
+      --keep-zshrc) KEEP_ZSHRC=yes ;;
+    esac
+    shift
+  done
 
+  setup_color
 
-# Because Git submodule commands cannot operate without a work tree, they must
-# be run from within $HOME (assuming this is the root of your dotfiles)
-cd "$HOME"
+  if ! command_exists zsh; then
+    echo "${YELLOW}Zsh is not installed.${RESET} Please install zsh first."
+    exit 1
+  fi
 
-echo "Init submodules"
-yadm submodule update --recursive --init
+  if [ -d "$ZSH" ]; then
+    echo "${YELLOW}The \$ZSH folder already exists ($ZSH).${RESET}"
+    if [ "$custom_zsh" = yes ]; then
+      cat <<EOF
+
+You ran the installer with the \$ZSH setting or the \$ZSH variable is
+exported. You have 3 options:
+
+1. Unset the ZSH variable when calling the installer:
+   $(fmt_code "ZSH= sh install.sh")
+2. Install Oh My Zsh to a directory that doesn't exist yet:
+   $(fmt_code "ZSH=path/to/new/ohmyzsh/folder sh install.sh")
+3. (Caution) If the folder doesn't contain important information,
+   you can just remove it with $(fmt_code "rm -r $ZSH")
+
+EOF
+    else
+      echo "You'll need to remove it if you want to reinstall."
+    fi
+    exit 1
+  fi
+
+  setup_ohmyzsh
+  setup_zshrc
+  setup_shell
+
+  print_success
+
+  if [ $RUNZSH = no ]; then
+    echo "${YELLOW}Run zsh to try it out.${RESET}"
+    exit
+  fi
+
+  exec zsh -l
+}
+
+main "$@"
