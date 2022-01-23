@@ -1,4 +1,3 @@
-exec zsh
 # ~/.bashrc: executed by bash(1) for non-login shells.
 # set a fancy prompt (non-color, unless we know we "want" color)
 case "$TERM" in
