@@ -1,0 +1,2 @@
+from ServiceSetting import *
+main()
