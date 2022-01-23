@@ -1,0 +1,471 @@
+
+#import subprocess as commands
+import os
+import socket
+import sys
+import time
+import json
+
+if sys.version_info < (3, 5):
+    from urllib2 import urlopen
+    import commands
+else:
+    from urllib.request import urlopen
+    import subprocess as commands
+# from flask import Flask
+
+# app=Flask(__name__)
+# @app.route('/index')
+# def my_page():
+#     f = open('index.html',encoding='utf-8')
+#     res = f.read()
+#     f.close()
+#     return res
+    
+#app = Flask(__name__)
+
+from flask import Flask,render_template,request,redirect,url_for,jsonify
+from werkzeug.utils import secure_filename
+from flask_cors import CORS, cross_origin
+vnckey="800x1600"
+
+import mmkv
+import struct
+
+mmkv.MMKV.initializeMMKV('/tmp/mmkv')
+
+kv = mmkv.MMKV('aid_login', mmkv.MMKVMode.MultiProcess)
+
+app = Flask(__name__)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
+# install logs
+global commands_result
+commands_result = []
+# 0 not install 1 installing
+global installStatus
+installStatus = 0
+# installing app key
+global installAppKey
+installAppKey = ''
+
+def _decode_data(byte_data: bytes):
+    try:
+        return byte_data.decode('UTF-8')
+    except UnicodeDecodeError:
+        return byte_data.decode('GB18030')
+
+def aid_run(cmd, shell=True):
+    p = commands.Popen(cmd, shell=True, stdout=commands.PIPE)
+    global commands_result
+    commands_result = []
+    global installStatus
+    installStatus = 1
+    while p.poll() is None:
+        line = p.stdout.readline().strip()  
+        if line:
+            line = _decode_data(line)  
+            if(line.find('\r')<1):
+                line+='\r'
+            
+            if(line.find('404')<1 and line.find('.deb')<1 and line.find('200 OK')<1):
+                if (line.startswith('Downloading:')):
+                    thelastline = commands_result[len(commands_result) - 1]
+                    if (thelastline.startswith('Downloading:')):
+                        commands_result[len(commands_result) - 1] = line
+                    else:
+                        commands_result.append(line)
+                else:
+                    commands_result.append(line)
+        sys.stdout.flush()
+        sys.stderr.flush()
+    return p.returncode, '\r\n'.join(commands_result)
+
+@app.route('/upload', methods=['POST', 'GET'])
+def upload():
+    if request.method == 'POST':
+        f = request.files['file']
+        basepath = os.path.dirname(__file__)  
+        upload_path = os.path.join(basepath, './',secure_filename(f.filename))
+        f.save(upload_path)
+        urlopen('http://127.0.0.1:9000/?name=ssh')
+        return render_template('uploadsucess.html')
+    return render_template('upload.html')
+    
+@app.route('/login', methods=['POST', 'GET'])
+def login():
+    if request.method == 'GET':
+        sid = request.args['sid']
+        spassword=request.args['spassword']
+        kv.set(sid, 'sid')
+        kv.set(spassword, 'spassword')
+        return render_template('vnc-resize.html')
+    return render_template('vnc-resize.html')
+    
+@app.route('/appb', methods=['POST', 'GET'])
+def appb():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        key = request.args['key']
+        global vnckey
+        if vnckey == key :
+            # commands.getstatusoutput("vncserver-start;")
+            #commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;vncserver -geometry '+key+' -depth 16 -name remote-desktop :1')
+            return render_template('vnc-resize.html')
+        else :
+            commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -x ~/.vnc/xstartup -depth 16 -localhost  -name remote-desktop :1 &')
+            time.sleep(3)
+            vnckey=key
+        
+    return render_template('vnc-resize.html')
+    
+@app.route('/appx', methods=['POST', 'GET'])
+def appx():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        key = request.args['key']
+        global vnckey
+        if vnckey == key :
+            # commands.getstatusoutput("vncserver-start;")
+            #commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;vncserver -geometry '+key+' -depth 16 -name remote-desktop :1')
+            return render_template('vnc-resize.html')
+        else :
+            commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -xstartup ~/.vnc/xstartup -depth 16 -localhost no -name remote-desktop :1 &')
+
+            # commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -depth 16 -name remote-desktop :1 &')
+            time.sleep(3)
+            vnckey=key
+        
+    return render_template('vnc-resize.html')
+
+@app.route('/appp', methods=['POST', 'GET'])
+def appp():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        key = request.args['key']
+        global vnckey
+        if vnckey == key :
+            # commands.getstatusoutput("vncserver-start;")
+            #commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;vncserver -geometry '+key+' -depth 16 -name remote-desktop :1')
+            return render_template('vnc-resize.html')
+        else :
+            commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -xstartup ~/.vnc/pstartup -depth 16 -localhost no -name remote-desktop :1 &')
+
+            # commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -depth 16 -name remote-desktop :1 &')
+            time.sleep(3)
+            vnckey=key
+        
+    return render_template('vnc-resize.html')
+
+@app.route('/apps', methods=['POST', 'GET'])
+def apps():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        key = request.args['key']
+        global vnckey
+        if vnckey == key :
+            # commands.getstatusoutput("vncserver-start;")
+            #commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;vncserver -geometry '+key+' -depth 16 -name remote-desktop :1')
+            return render_template('vnc-resize.html')
+        else :
+            commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -xstartup ~/.vnc/sstartup -depth 16 -localhost no -name remote-desktop :1 &')
+
+            # commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -depth 16 -name remote-desktop :1 &')
+            time.sleep(3)
+            vnckey=key
+        
+    return render_template('vnc-resize.html')
+    
+@app.route('/lfce', methods=['POST', 'GET'])
+def lfce():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        key = request.args['key']
+        global vnckey
+        if vnckey == key :
+            (status,output)=commands.getstatusoutput('startx &')
+            return render_template('vnc-resize.html')
+        else :
+            commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;LD_PRELOAD=/lib/aarch64-linux-gnu/libgcc_s.so.1 vncserver -geometry '+key+' -depth 16 -localhost no -name remote-desktop :1;')
+            # time.sleep(5)
+            (status,output)=commands.getstatusoutput('cd /home;python .autoxfce.py &')
+            vnckey=key
+        
+    return render_template('vnc-resize.html')
+    
+@app.route('/startbot', methods=['POST', 'GET'])
+def startbot():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    commands.getstatusoutput("cd /home/examples-gpu/object-detection;python test_autobot.py ")
+        
+    return render_template('openbot.html')
+    
+@app.route('/tflite_shutdown', methods=['GET'])
+def tflite_shutdown():
+    import android
+    droid = android.Android()
+    droid.shutdown()
+    return jsonify({'code': '200', 'message': 'success', 'data': 'Complete'})
+
+@app.route('/cvs_shutdown', methods=['GET'])
+@cross_origin()
+def cvs_shutdown():
+    filename = request.args['filename']
+    import android
+    droid = android.Android()
+    droid.usbCamClose()
+    droid.realCamClose()
+    droid.shutdown()
+    urlopen('http://127.0.0.1:9000/?name=kill~'+filename)
+    return jsonify({'res': 'OK'})
+
+# @app.route('/applist', methods=['POST', 'GET'])
+# @cross_origin(supports_credentials=True)
+# def applist():
+#     #start_response('200 OK', [('Content-Type', 'text/html')])
+#     #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+#     if request.method == 'GET':
+#         stdout, stderr=commands.getstatusoutput("aid list")
+#         applist=stderr.split('\n')[1:]
+#         return json.dumps(applist,ensure_ascii=False)
+#     else :
+#         return json.dumps(['timeout','wait'],ensure_ascii=False)
+
+@app.route('/applist', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appnewlist():
+    if request.method == 'GET':
+        # stdout, stderr=commands.getstatusoutput("aid list")
+        # applist=stderr.split('\n')[1:]
+        # return json.dumps(applist,ensure_ascii=False)
+        with urlopen('http://www.aidlearning.net/debinfo/aidlist.json') as f:
+            data = json.load(f)
+            print(data)
+            return json.dumps(data,ensure_ascii=False)
+        return json.dumps([],ensure_ascii=False)
+    else :
+        return json.dumps(['timeout','wait'],ensure_ascii=False)
+        
+@app.route('/appinstalled', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appinstalled():
+    if request.method == 'GET':
+        # stdout, stderr=commands.getstatusoutput("aid list")
+        # applist=stderr.split('\n')[1:]
+        # return json.dumps(applist,ensure_ascii=False)
+        baseAppPath = "/usr/share/aid" + "/info/"
+        if not os.path.exists(baseAppPath) :
+            return json.dumps([], ensure_ascii=False)
+        files = os.listdir(baseAppPath)
+        installedApp = []
+        
+        if files:
+            for file in files:
+                if file.endswith('.json') :
+                    with open(baseAppPath + file, 'r') as info: 
+                        data = json.load(info)
+                        installedApp.append(data)
+            return json.dumps(installedApp, ensure_ascii=False)
+        else :
+            return json.dumps([], ensure_ascii=False)
+    else :
+        return json.dumps(['timeout','wait'],ensure_ascii=False)
+        
+@app.route('/appinstall', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appinstall():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        appkey = request.args['appkey']
+        global installAppKey
+        installAppKey = appkey
+        stdout, stderr=aid_run("aid install "+appkey+" -b")
+        applist=stderr.split('\n')[1:]
+        global installStatus
+        installStatus = 0
+        return json.dumps(applist,ensure_ascii=False)
+    else:
+        return json.dumps(['timeout','wait'],ensure_ascii=False)
+
+@app.route('/get_app_installing', methods=['GET'])
+@cross_origin(supports_credentials=True)
+def get_app_installing():
+    global installStatus
+    global installAppKey
+    if installStatus == 1:
+        return json.dumps({ 'app_key': installAppKey }, ensure_ascii=False)
+    else :
+        return json.dumps(False, ensure_ascii=False)
+
+@app.route('/appsearch', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appsearch():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        appkey = request.args['appkey'] 
+        stdout, stderr=commands.getstatusoutput("aid search "+appkey)
+        applist=stderr.split('\n')[1:]
+        return json.dumps(applist,ensure_ascii=False)   
+    else:
+        return json.dumps(['timeout','wait'],ensure_ascii=False)
+        
+@app.route('/appremove', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appremove():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    if request.method == 'GET':
+        appkey = request.args['appkey']        
+        stdout, stderr=commands.getstatusoutput("aid remove "+appkey)
+        applist=stderr.split('\n')[1:]
+        return json.dumps(applist,ensure_ascii=False)   
+    else :
+        return json.dumps(['timeout','wait'],ensure_ascii=False)
+        
+@app.route('/appgetlog', methods=['POST', 'GET'])
+@cross_origin(supports_credentials=True)
+def appgetlog():
+    #start_response('200 OK', [('Content-Type', 'text/html')])
+    #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+    global commands_result
+    print(commands_result)
+    if request.method == 'GET':
+        #applist=result.split('\n')[1:]
+        return json.dumps(commands_result,ensure_ascii=False)   
+    else :
+        return json.dumps(['timeout','wait'],ensure_ascii=False)        
+        
+def IsOpen(ip,port):
+    s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    try:
+        s.connect((ip,int(port)))
+        # s.shutdown(2)
+        print ('%d is used' % port)
+        return True
+    except:
+        print ('%d is unused' % port)
+        #print '%d is down' % port
+        return False
+def yingyong(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    commands.getstatusoutput('am start -n com.termux.api/xinda.activity.CameraActivity')
+    return [b'<h1>!</h1>']
+from wsgiref.simple_server import make_server
+
+@app.route('/getAuthorizInfo', methods=['GET'])
+def get_authoriz_info():
+    from aidluxlvt import do_verify
+    import json
+    return json.dumps({'code': 200, 'message': 'success', 'data': do_verify()})
+
+def notifyPythonReady():
+    import android
+    a = android.Android()
+    print('ready')
+    a.startAuthorizationToVerify()
+
+if __name__ == '__main__':
+
+    b=8910
+    notifyPythonReady()
+    if IsOpen('127.0.0.1',b) :
+        b=8910
+        commands.getstatusoutput("trap 'bash' EXIT")
+        # IsOpen('127.0.0.1',b)
+        # app.run(host='0.0.0.0',port=b,debug=False,threaded=True)
+    else :
+        app.run(host='0.0.0.0',port=b,debug=False,threaded=True)
+        
+
+# #import subprocess as commands
+# import os
+# import socket
+# import sys
+
+# if sys.version_info < (3, 5):
+#     from urllib2 import urlopen
+#     import commands
+# else:
+#     from urllib.request import urlopen
+#     import subprocess as commands
+# # from flask import Flask
+
+# # app=Flask(__name__)
+# # @app.route('/index')
+# # def my_page():
+# #     f = open('index.html',encoding='utf-8')
+# #     res = f.read()
+# #     f.close()
+# #     return res
+    
+# #app = Flask(__name__)
+
+# from flask import Flask,render_template,request,redirect,url_for
+# from werkzeug.utils import secure_filename
+
+# vnckey=""
+
+# app = Flask(__name__)
+
+# @app.route('/upload', methods=['POST', 'GET'])
+# def upload():
+#     if request.method == 'POST':
+#         f = request.files['file']
+#         basepath = os.path.dirname(__file__)  
+#         upload_path = os.path.join(basepath, './',secure_filename(f.filename))
+#         f.save(upload_path)
+#         urlopen('http://127.0.0.1:9000/?name=ssh')
+#         return render_template('uploadsucess.html')
+#     return render_template('upload.html')
+    
+# @app.route('/appb', methods=['POST', 'GET'])
+# def appb():
+#     #start_response('200 OK', [('Content-Type', 'text/html')])
+#     #commands.getstatusoutput("cd /root/.sset/;python .ApkBuild")
+#     if request.method == 'GET':
+#         key = request.args['key']
+#         global vnckey
+#         if vnckey == key :
+#             return render_template('vnc-resize.html')
+#         else :
+#             commands.getstatusoutput('export USER=root;export HOME=/root;vncserver -kill :1;rm -rf /tmp/.X1-lock;rm -rf /tmp/.X11-unix/X1;vncserver -geometry '+key+' -depth 16 -name remote-desktop :1')
+#             vnckey=key
+        
+#     return render_template('vnc-resize.html')
+
+
+# def IsOpen(ip,port):
+#     s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+#     try:
+#         s.connect((ip,int(port)))
+#         s.shutdown(2)
+#         print ('%d is used' % port)
+#         return True
+#     except:
+#         print ('%d is unused' % port)
+#         #print '%d is down' % port
+#         return False
+# def yingyong(environ, start_response):
+#     start_response('200 OK', [('Content-Type', 'text/html')])
+#     commands.getstatusoutput('am start -n com.termux.api/xinda.activity.CameraActivity')
+#     return [b'<h1>!</h1>']
+# from wsgiref.simple_server import make_server
+
+# if __name__ == '__main__':
+
+#     b=8910
+
+#     if IsOpen('127.0.0.1',b) :
+#         b=8910
+#         #app.run(host='0.0.0.0',port=b,debug=False,threaded=True)
+#     else :
+#         app.run(host='0.0.0.0',port=b,debug=False,threaded=True)
+
